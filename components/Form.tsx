@@ -17,8 +17,7 @@ import {
 } from "@chakra-ui/react"
 import * as web3 from "@solana/web3.js"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
-
-const MOVIE_REVIEW_PROGRAM_ID = "FHnxHrHJjgDad6hLNSuYma1VnTuCsKKMkpjVw5QbnmAd"
+import { MOVIE_REVIEW_PROGRAM_ID } from "../utils/constants"
 
 export const Form: FC = () => {
     const [title, setTitle] = useState("")
@@ -31,7 +30,12 @@ export const Form: FC = () => {
 
     const handleSubmit = (event: any) => {
         event.preventDefault()
-        const movie = new Movie(title, rating, description)
+        if (!publicKey) {
+            alert("Please connect your wallet!")
+            return
+        }
+
+        const movie = new Movie(title, rating, description, publicKey)
         handleTransactionSubmit(movie)
     }
 
@@ -40,6 +44,7 @@ export const Form: FC = () => {
             alert("Please connect your wallet!")
             return
         }
+        console.log(movie)
 
         const buffer = movie.serialize(toggle ? 0 : 1)
         const transaction = new web3.Transaction()
@@ -48,6 +53,15 @@ export const Form: FC = () => {
             [publicKey.toBuffer(), Buffer.from(movie.title)], // new TextEncoder().encode(movie.title)],
             new web3.PublicKey(MOVIE_REVIEW_PROGRAM_ID)
         )
+
+        console.log(pda)
+
+        const [pdaCounter] = await web3.PublicKey.findProgramAddress(
+            [pda.toBuffer(), Buffer.from("comment")], // new TextEncoder().encode(movie.title)],
+            new web3.PublicKey(MOVIE_REVIEW_PROGRAM_ID)
+        )
+
+        console.log(pdaCounter)
 
         const instruction = new web3.TransactionInstruction({
             keys: [
@@ -66,12 +80,18 @@ export const Form: FC = () => {
                     isSigner: false,
                     isWritable: false,
                 },
+                {
+                    pubkey: pdaCounter,
+                    isSigner: false,
+                    isWritable: true,
+                }
             ],
             data: buffer,
             programId: new web3.PublicKey(MOVIE_REVIEW_PROGRAM_ID),
         })
 
         transaction.add(instruction)
+        console.log(transaction)
 
         try {
             let txid = await sendTransaction(transaction, connection)
@@ -82,6 +102,7 @@ export const Form: FC = () => {
                 `Transaction submitted: https://explorer.solana.com/tx/${txid}?cluster=devnet`
             )
         } catch (e) {
+            console.log("putaa")
             console.log(JSON.stringify(e))
             alert(JSON.stringify(e))
         }
